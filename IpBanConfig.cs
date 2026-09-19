@@ -29,6 +29,7 @@ namespace IPBanFrontend
             "UserNameWhitelistMinimumEditDistance",
             "FailedLoginAttemptsBeforeBanUserNameWhitelist",
             "UseDefaultBannedIPAddressHandler",
+            "IPThreatApiKey",
             "ProcessToRunOnBan",
             "ProcessToRunOnUnban",
             "ProcessToRunOnSuccessfulLogin",
@@ -57,10 +58,11 @@ namespace IPBanFrontend
             ["UserNameWhitelistMinimumEditDistance"] = "Levenshtein-afstand: groter = sneller bannen bij foute namen",
             ["FailedLoginAttemptsBeforeBanUserNameWhitelist"] = "Drempel voor whitelisted usernames",
             ["UseDefaultBannedIPAddressHandler"] = "true/false — anonieme ban-sharing met IPBan-cloud",
+            ["IPThreatApiKey"] = "Gratis community: API-key van ipthreat.net — stuurt failed logins automatisch door (na reporting-rechten)",
             ["ProcessToRunOnBan"] = "pad|args — ###IPADDRESS### wordt vervangen",
             ["ProcessToRunOnUnban"] = "pad|args bij unban",
             ["ProcessToRunOnSuccessfulLogin"] = "pad|args bij succesvolle login",
-            ["FirewallUriRules"] = "Één per regel: Prefix,DD:HH:MM:SS,https://…",
+            ["FirewallUriRules"] = "Community blocklists — één per regel: Prefix,DD:HH:MM:SS,https://…[,MaxCount]. Sync bv. elke 8u: 00:08:00:00",
             ["FirewallRules"] = "Één per regel: naam;allow|block;ips;poorten;platform-regex",
             ["ExternalIPAddressUrl"] = "URL die het publieke IP teruggeeft (plain text)"
         };

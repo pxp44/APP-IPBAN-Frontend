@@ -11,7 +11,22 @@
     <Deterministic>true</Deterministic>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- AnyCPU + wrong native sqlite DLL caused: type initializer SqliteConnection failed -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
+  <!-- Ensure x64 e_sqlite3.dll is in output (SDK sometimes flattens the x86 one). -->
+  <Target Name="CopySqliteNativeX64" AfterTargets="Build">
+    <PropertyGroup>
+      <_NuGetRoot>$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))</_NuGetRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <_SqliteNativeCand Include="$(_NuGetRoot)sqlitepclraw.lib.e_sqlite3\**\runtimes\win-x64\native\e_sqlite3.dll" />
+      <_SqliteNativeCand Include="$(USERPROFILE)\.nuget\packages\sqlitepclraw.lib.e_sqlite3\**\runtimes\win-x64\native\e_sqlite3.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_SqliteNativeCand)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="false" Condition="'@(_SqliteNativeCand)' != ''" />
+    <Warning Text="x64 e_sqlite3.dll not found (NuGetPackageRoot=$(_NuGetRoot))" Condition="'@(_SqliteNativeCand)' == ''" />
+  </Target>
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <Optimize>true</Optimize>
     <DebugType>none</DebugType>

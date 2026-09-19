@@ -1,0 +1,31 @@
+# Build outputs
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+artifacts/
+TestResults/
+
+# NuGet
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+
+# IDE
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pfx
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

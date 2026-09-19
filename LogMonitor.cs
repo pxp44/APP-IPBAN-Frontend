@@ -31,6 +31,8 @@ namespace IPBanFrontend
         public string Raw { get; set; }
         public string Title { get; set; }
         public string Hint { get; set; }
+        /// <summary>FirewallUriRules / community blocklist name when known (e.g. EmergingThreats).</summary>
+        public string CommunityList { get; set; }
 
         public Color RowColor
         {
@@ -295,6 +297,7 @@ namespace IPBanFrontend
                 if (int.TryParse(mCnt.Groups["n"].Value, out n)) ev.Count = n;
             }
 
+            CommunityLists.Annotate(ev);
             Enrich(ev);
             return ev;
         }
@@ -329,30 +332,54 @@ namespace IPBanFrontend
                 : "Onbekende / lege gebruikersnaam";
             var where = !string.IsNullOrEmpty(ev.Ip) ? " vanaf " + ev.Ip : "";
             var via = !string.IsNullOrEmpty(ev.Source) ? " via " + FriendlySource(ev.Source) : "";
+            var community = !string.IsNullOrEmpty(ev.CommunityList)
+                ? " Community-list: «" + ev.CommunityList + "»."
+                : "";
+
+            // URI-list sync lines from IPBan
+            if (!string.IsNullOrEmpty(ev.Raw) &&
+                ev.Raw.IndexOf("firewall uri rule", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                ev.Title = "Community-list sync";
+                ev.Hint = "IPBan heeft een externe blocklist bijgewerkt" +
+                          (!string.IsNullOrEmpty(ev.CommunityList) ? " («" + ev.CommunityList + "»)" : "") +
+                          ". IP’s op die lijst worden in de Windows Firewall gezet vóór ze RDP raken." +
+                          community;
+                return;
+            }
 
             switch (ev.Kind)
             {
                 case MonitorKind.Failed:
-                    ev.Title = "Mislukte login";
+                    ev.Title = string.IsNullOrEmpty(ev.CommunityList)
+                        ? "Mislukte login"
+                        : "Mislukte login · community";
                     ev.Hint = who + where + via +
                               " — probeerde in te loggen met deze accountnaam." +
                               (ev.Count.HasValue ? " Teller voor dit IP: " + ev.Count + "." : "") +
-                              " Tip: eigen IP op whitelist; herhaalde aanvallen worden automatisch geband.";
+                              community +
+                              (string.IsNullOrEmpty(ev.CommunityList)
+                                  ? " Tip: eigen IP op whitelist; herhaalde aanvallen worden automatisch geband."
+                                  : " Dit IP stond al op een gedeelde blocklist (FirewallUriRules).");
                     break;
                 case MonitorKind.Ban:
-                    ev.Title = "IP geblokkeerd";
+                    ev.Title = string.IsNullOrEmpty(ev.CommunityList)
+                        ? "IP geblokkeerd"
+                        : "IP geblokkeerd · community";
                     ev.Hint = "IPBan heeft" + where + " in de firewall gezet" + via +
                               ". Dit IP mag (tijdelijk) niet meer verbinden. " + who + "." +
+                              community +
                               " Unban via tab Actieve bans of ‘Unban nu’ als dit van jou was.";
                     break;
                 case MonitorKind.Unban:
                     ev.Title = "IP gedeblokkeerd";
-                    ev.Hint = "Ban opgeheven voor" + where + ". Verbindingen vanaf dit IP zijn weer toegestaan.";
+                    ev.Hint = "Ban opgeheven voor" + where + ". Verbindingen vanaf dit IP zijn weer toegestaan." + community;
                     break;
                 case MonitorKind.Success:
                     ev.Title = "Geslaagde login";
                     ev.Hint = who + where + via +
-                              " — login gelukt. Herken je dit niet? Direct whitelisten controleren / wachtwoord wijzigen / IP bannen.";
+                              " — login gelukt. Herken je dit niet? Direct whitelisten controleren / wachtwoord wijzigen / IP bannen." +
+                              community;
                     break;
                 case MonitorKind.Error:
                     ev.Title = "Fout";
@@ -360,11 +387,11 @@ namespace IPBanFrontend
                     break;
                 case MonitorKind.Warn:
                     ev.Title = "Waarschuwing";
-                    ev.Hint = "Let op: iets vraagt aandacht (config, firewall-sync, drempel). Zie de logregel.";
+                    ev.Hint = "Let op: iets vraagt aandacht (config, firewall-sync, drempel). Zie de logregel." + community;
                     break;
                 default:
                     ev.Title = "Info";
-                    ev.Hint = "Informatieve regel van IPBan.";
+                    ev.Hint = "Informatieve regel van IPBan." + community;
                     break;
             }
         }
@@ -440,6 +467,7 @@ namespace IPBanFrontend
                    (Contains(line, "success") && Contains(line, "login")) ||
                    Regex.IsMatch(line, @"\bbanning\b|\bbanned\b|\bun-?ban", RegexOptions.IgnoreCase) ||
                    Contains(line, "firewall") ||
+                   Contains(line, "firewall uri rule") ||
                    Contains(line, "ERROR") || Contains(line, "FATAL") ||
                    (Contains(line, "WARN") && (Contains(line, "login") || Contains(line, "firewall") ||
                                                 Contains(line, "RDP") || Contains(line, "SSH")));

@@ -2167,7 +2167,11 @@ namespace IPBanFrontend
                 catch { dashService.Text = "n.v.t."; }
 
                 if (forceLogScan || _lastMonitor == null)
+                {
+                    try { CommunityLists.RefreshIfStale(_firewallPrefix, TimeSpan.FromMinutes(10)); }
+                    catch { /* ignore */ }
                     _lastMonitor = LogMonitor.Analyze(LogPath, _monitorPeriod);
+                }
                 if (_lastMonitor != null)
                 {
                     if (_banHistory == null) _banHistory = BanHistoryStore.Load();
@@ -2320,6 +2324,8 @@ namespace IPBanFrontend
                 item.SubItems.Add(string.IsNullOrEmpty(ev.Source) ? "—" : ev.Source);
                 item.SubItems[4].BackColor = ev.RowColor;
                 var shortHint = ev.Title;
+                if (!string.IsNullOrEmpty(ev.CommunityList))
+                    shortHint += " · list «" + ev.CommunityList + "»";
                 if (!string.IsNullOrEmpty(ev.User)) shortHint += " · " + ev.User;
                 if (!string.IsNullOrEmpty(ev.Source)) shortHint += " · " + ev.Source;
                 item.SubItems.Add(shortHint);
@@ -2339,7 +2345,8 @@ namespace IPBanFrontend
             if (ev == null) return;
             lblMonitorSummary.Text = ev.KindLabel + "  ·  " + (ev.Ip ?? "geen IP") +
                                      (string.IsNullOrEmpty(ev.User) ? "" : "  ·  user «" + ev.User + "»") +
-                                     (string.IsNullOrEmpty(ev.Source) ? "" : "  ·  " + ev.Source);
+                                     (string.IsNullOrEmpty(ev.Source) ? "" : "  ·  " + ev.Source) +
+                                     (string.IsNullOrEmpty(ev.CommunityList) ? "" : "  ·  community «" + ev.CommunityList + "»");
             lblMonitorHint.Text = ev.Hint;
             if (!string.IsNullOrEmpty(ev.Ip))
             {
@@ -2367,7 +2374,9 @@ namespace IPBanFrontend
             var ev = lvRecent.SelectedItems[0].Tag as MonitorEvent;
             if (ev == null) return;
             MessageBox.Show(this,
-                ev.Title + "\n\n" + ev.Hint + "\n\n—\n" + ev.Raw,
+                ev.Title + "\n\n" + ev.Hint +
+                (string.IsNullOrEmpty(ev.CommunityList) ? "" : "\n\nCommunity-list: " + ev.CommunityList) +
+                "\n\n—\n" + ev.Raw,
                 "Event", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
@@ -3293,15 +3302,16 @@ namespace IPBanFrontend
 
         string FilterLogChunk(string chunk)
         {
+            try { CommunityLists.RefreshIfStale(_firewallPrefix, TimeSpan.FromMinutes(10)); }
+            catch { /* ignore */ }
+
             var mode = cmbLogLevel.SelectedItem as string ?? "Alles";
             var q = txtLogFilter.Text.Trim();
-            if (mode == "Alles" && q.Length == 0) return chunk;
-
             var sb = new StringBuilder();
             foreach (var line in chunk.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
             {
                 if (!LineMatchesFilter(line, mode, q)) continue;
-                sb.AppendLine(line);
+                sb.AppendLine(CommunityLists.AnnotateLogLine(line));
             }
             return sb.ToString();
         }

@@ -1,57 +1,67 @@
 IPBan Frontend
 ==============
 
-WinForms-GUI voor de gratis IPBan-service op Windows — Pro-achtig lokaal beheer
-zonder multi-server / country-block / IPBan Shield (dat blijft Pro).
+WinForms GUI for the free IPBan service on Windows — Pro-like local management
+without multi-server / country-block / IPBan Shield (those remain Pro features).
 
-Kan
----
-- Dashboard: bans, mislukte logins, white/blacklist, service, recente log-events
-- Actieve bans uit ipban.sqlite (unban, whitelist+unban, CSV-export)
-- Mislukte logins (nog onder de ban-drempel) bekijken en forceren te bannen
-- Whitelist / blacklist bewerken (+ regex, bulk plakken)
-- Instellingen uit ipban.config (BanTime, drempels, FirewallRules, UriRules, …)
-- Windows Firewall-regels met IPBan_-prefix tonen
-- Live logfile met filter / pauze
-- Service start/stop/herstart
-- Direct ban/unban via ban.txt / unban.txt
-- Publiek IP ophalen en whitelisten
+Features
+--------
+- Home dashboard: bans, failed logins, white/blacklist, service status, recent log events
+- Active bans from ipban.sqlite (unban, whitelist+unban, CSV export)
+- Failed logins still under the ban threshold — view and force-ban
+- Attack trend charts (attempts vs previous period)
+- Whitelist / blacklist editing (+ regex, bulk paste)
+- Auto-blacklist after repeated bans (default: after 3 ban episodes)
+- Settings from ipban.config (BanTime, thresholds, FirewallRules, UriRules, …)
+- Community blocklists via FirewallUriRules (sync e.g. every 8h); log shows [community: ListName]
+- Windows Firewall rules with the IPBan_ prefix
+- Live logfile with filter / pause
+- Start / stop / restart the IPBan service
+- Direct ban / unban via ban.txt / unban.txt
+- Fetch and whitelist your public IP
+- Weekly backups, zip export, and chart export
+  (%ProgramData%\IPBanFrontend)
 
-Vereisten
----------
-- Windows Server 2016/2019/2022 of Windows 10/11
+Requirements
+------------
+- Windows Server 2016/2019/2022 or Windows 10/11
 - .NET Framework 4.8
-- Optioneel Administrator (bij start kun je kiezen: UAC of beperkt)
-- IPBan geïnstalleerd in C:\Program Files\IPBan (of andere map instellen)
-- Bij bouwen: .NET SDK (voor NuGet Microsoft.Data.Sqlite)
+- Optional Administrator (at startup you can choose: UAC or limited)
+- IPBan installed in C:\Program Files\IPBan (or set another folder)
+- When building: .NET SDK (for the Microsoft.Data.Sqlite NuGet package)
 
 Autostart (enabled)
 -------------------
-Instellingen-tab → "enabled — Windows-service starten bij systeemstart".
-Dat registreert Windows-service "IPBanFrontend" (start=auto), ook zonder login.
-De GUI zelf kan niet vóór login zichtbaar zijn (Session 0); optioneel start die
-na login in het systeemvak (--tray). Settings: %ProgramData%\IPBanFrontend\settings.json
+Settings tab → "enabled — start Windows service at system startup".
+This registers the Windows service "IPBanFrontend" (start=auto), even without a login.
+The GUI itself cannot appear before login (Session 0); optionally it starts in the
+system tray after logon (--tray). Settings: %ProgramData%\IPBanFrontend\settings.json
 
-  { "enabled": true, "startGuiAtLogon": true, ... }
+  {
+    "enabled": true,
+    "startGuiAtLogon": true,
+    "autoBlacklistAfterBans": 3,
+    "installDir": "C:\\Program Files\\IPBan"
+  }
 
 CLI: IPBanFrontend.exe --install-autostart | --uninstall-autostart | --service | --tray
 
-Bouwen
-------
+Build
+-----
   dotnet build IPBanFrontend.csproj -c Release
 
-  Output: bin\Release\  (hele map kopiëren)
+  Output: bin\Release\  (copy the entire folder)
 
-Gebruik
--------
-1. IPBan geïnstalleerd.
-2. IPBanFrontend.exe — kies Ja voor admin, of Nee voor beperkt.
-3. Controleer de IPBan-map.
-4. Whitelist jouw IP → Opslaan → herstart IPBan-service.
-5. Optioneel: autostart enabled + Toepassen.
+Usage
+-----
+1. Install IPBan.
+2. Run IPBanFrontend.exe — choose Yes for admin, or No for limited mode.
+3. Confirm the IPBan folder.
+4. Whitelist your IP → Save → restart the IPBan service.
+5. Optional: enable autostart + Apply.
 
-Let op
-------
-- Whitelist in deze tool = config-sleutel Whitelist.
-- ban.txt / unban.txt worden door IPBan zelf opgepakt (één cyclus wachten).
-- Dit is geen officieel IPBan-product.
+Notes
+-----
+- Whitelist in this tool = the config key Whitelist.
+- ban.txt / unban.txt are picked up by IPBan itself (wait one cycle).
+- This is not an official IPBan product.

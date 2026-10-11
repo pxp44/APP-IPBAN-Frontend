@@ -12,6 +12,10 @@ namespace IPBanFrontend
     {
         public const string ServiceName = "IPBanFrontend";
         public const string TaskName = "IPBanFrontendLogonGui";
+        /// <summary>Vaste kopie op systeemschijf — altijd beschikbaar bij boot (niet de buildmap).</summary>
+        public const string InstallFolder = @"C:\Program Files\IPBanFrontend";
+
+        public static string InstalledExePath => Path.Combine(InstallFolder, "IPBanFrontend.exe");
 
         public static bool IsServiceInstalled()
         {
@@ -21,6 +25,34 @@ namespace IPBanFrontend
                 {
                     var _ = sc.Status;
                     return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool NeedsRepair(bool startGuiAtLogon)
+        {
+            if (!File.Exists(InstalledExePath)) return true;
+            if (!IsServiceInstalled()) return true;
+            if (!ServiceImagePathLooksValid()) return true;
+            if (startGuiAtLogon && !IsLogonTaskPresent()) return true;
+            return false;
+        }
+
+        static bool ServiceImagePathLooksValid()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Services\" + ServiceName))
+                {
+                    var image = key == null ? null : key.GetValue("ImagePath") as string;
+                    if (string.IsNullOrWhiteSpace(image)) return false;
+                    return image.IndexOf(InstallFolder, StringComparison.OrdinalIgnoreCase) >= 0
+                           && image.IndexOf("--service", StringComparison.OrdinalIgnoreCase) >= 0;
                 }
             }
             catch
@@ -51,7 +83,7 @@ namespace IPBanFrontend
         {
             RemoveServiceWithRetry();
 
-            var exe = ApplicationPath();
+            var exe = DeployToStableFolder();
             var create = "create " + ServiceName +
                          " binPath= \"" + exe + " --service\"" +
                          " start= auto" +
@@ -65,6 +97,10 @@ namespace IPBanFrontend
             RunSc("description " + ServiceName +
                   " \"IPBan Frontend achtergronddienst — start bij systeemstart, ook zonder ingelogde gebruiker.\"",
                 ignoreErrors: true);
+            RunSc("failure " + ServiceName +
+                  " reset= 86400 actions= restart/5000/restart/15000/restart/60000",
+                ignoreErrors: true);
+            RunSc("config " + ServiceName + " start= delayed-auto", ignoreErrors: true);
 
             RunSc("start " + ServiceName, ignoreErrors: true);
             WaitForService(ServiceControllerStatus.Running, 15000);
@@ -72,7 +108,7 @@ namespace IPBanFrontend
             UnregisterLogonTask();
             if (startGuiAtLogon)
             {
-                if (!RegisterLogonTask())
+                if (!RegisterLogonTask(exe))
                     AppSettings.AppendServiceLog("Waarschuwing: logon-GUI taak niet aangemaakt; service wel OK.");
             }
 
@@ -151,9 +187,72 @@ namespace IPBanFrontend
             catch { /* not installed */ }
         }
 
-        static bool RegisterLogonTask()
+        /// <summary>Kopieert de draaiende build naar Program Files zodat boot niet van een verdwenen map afhangt.</summary>
+        static string DeployToStableFolder()
         {
-            var exe = ApplicationPath();
+            var srcExe = ApplicationPath();
+            var srcDir = Path.GetDirectoryName(srcExe);
+            if (string.IsNullOrEmpty(srcDir) || !File.Exists(srcExe))
+                throw new InvalidOperationException("Kan IPBanFrontend.exe niet vinden om te installeren.");
+
+            Directory.CreateDirectory(InstallFolder);
+            var destExe = InstalledExePath;
+
+            if (!PathsEqual(srcDir, InstallFolder))
+            {
+                var copied = 0;
+                foreach (var file in Directory.GetFiles(srcDir))
+                {
+                    var dest = Path.Combine(InstallFolder, Path.GetFileName(file));
+                    CopyFileWithRetry(file, dest);
+                    copied++;
+                }
+                AppSettings.AppendServiceLog("Geïnstalleerd naar " + InstallFolder + " (" + copied + " bestanden).");
+            }
+
+            if (!File.Exists(destExe))
+                throw new InvalidOperationException("Installatie mislukt: " + destExe + " ontbreekt.");
+
+            return destExe;
+        }
+
+        static void CopyFileWithRetry(string src, string dest)
+        {
+            Exception last = null;
+            for (var i = 0; i < 5; i++)
+            {
+                try
+                {
+                    File.Copy(src, dest, true);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    Thread.Sleep(250 + i * 200);
+                }
+            }
+            throw new InvalidOperationException("Kopiëren mislukt: " + Path.GetFileName(src) + " — " +
+                                                (last != null ? last.Message : "onbekend"));
+        }
+
+        static bool PathsEqual(string a, string b)
+        {
+            try
+            {
+                return string.Equals(
+                    Path.GetFullPath(a ?? "").TrimEnd('\\', '/'),
+                    Path.GetFullPath(b ?? "").TrimEnd('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        static bool RegisterLogonTask(string exe)
+        {
             var xmlPath = Path.Combine(Path.GetTempPath(), "IPBanFrontend-logon-task.xml");
             try
             {

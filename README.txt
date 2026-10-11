@@ -13,6 +13,8 @@ Features
 - Whitelist / blacklist editing (+ regex, bulk paste)
 - Auto-blacklist after repeated bans (default: after 3 ban episodes)
 - Settings from ipban.config (BanTime, thresholds, FirewallRules, UriRules, …)
+- IPThreat: share failed logins (API key from .env → IPThreatApiKey) and receive the
+  community list via FirewallUriRules (hourly gzip, default threat ≥ 90%)
 - Community blocklists via FirewallUriRules (sync e.g. every 8h); log shows [community: ListName]
 - Windows Firewall rules with the IPBan_ prefix
 - Live logfile with filter / pause
@@ -33,7 +35,8 @@ Requirements
 Autostart (enabled)
 -------------------
 Settings tab → "enabled — start Windows service at system startup".
-This registers the Windows service "IPBanFrontend" (start=auto), even without a login.
+This copies the app to C:\Program Files\IPBanFrontend and registers the Windows
+service "IPBanFrontend" (delayed auto-start + restart on failure), even without a login.
 The GUI itself cannot appear before login (Session 0); optionally it starts in the
 system tray after logon (--tray). Settings: %ProgramData%\IPBanFrontend\settings.json
 
@@ -44,7 +47,7 @@ system tray after logon (--tray). Settings: %ProgramData%\IPBanFrontend\settings
     "installDir": "C:\\Program Files\\IPBan"
   }
 
-CLI: IPBanFrontend.exe --install-autostart | --uninstall-autostart | --service | --tray
+CLI: IPBanFrontend.exe --install-autostart | --uninstall-autostart | --service | --tray | --apply-ipthreat
 
 Build
 -----
@@ -59,6 +62,11 @@ Usage
 3. Confirm the IPBan folder.
 4. Whitelist your IP → Save → restart the IPBan service.
 5. Optional: enable autostart + Apply.
+6. IPThreat: put IPThreat_API_KEY in .env (the key only, ending in == — not a numeric id),
+   then Instellingen → IPThreat → Toepassen (or IPBanFrontend.exe --apply-ipthreat).
+   A 403 Access denied means the key is present but bulk-report permission is missing:
+   https://ipthreat.net/requestpermissions (email admin@ipthreat.net). Receiving lists
+   works without that permission.
 
 Notes
 -----

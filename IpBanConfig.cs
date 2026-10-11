@@ -58,7 +58,7 @@ namespace IPBanFrontend
             ["UserNameWhitelistMinimumEditDistance"] = "Levenshtein-afstand: groter = sneller bannen bij foute namen",
             ["FailedLoginAttemptsBeforeBanUserNameWhitelist"] = "Drempel voor whitelisted usernames",
             ["UseDefaultBannedIPAddressHandler"] = "true/false — anonieme ban-sharing met IPBan-cloud",
-            ["IPThreatApiKey"] = "Gratis community: API-key van ipthreat.net — stuurt failed logins automatisch door (na reporting-rechten)",
+            ["IPThreatApiKey"] = "IPThreat: deel failed logins (kale API-key, eindigt op ==). 403 = nog geen bulk-report rechten op ipthreat.net/requestpermissions. Ontvang-lijst: FirewallUriRules.",
             ["ProcessToRunOnBan"] = "pad|args — ###IPADDRESS### wordt vervangen",
             ["ProcessToRunOnUnban"] = "pad|args bij unban",
             ["ProcessToRunOnSuccessfulLogin"] = "pad|args bij succesvolle login",

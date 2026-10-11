@@ -94,6 +94,11 @@ namespace IPBanFrontend
         readonly TextBox txtUserNames = new TextBox();
         readonly TextBox txtFirewallRules = new TextBox();
         readonly TextBox txtFirewallUriRules = new TextBox();
+        readonly CheckBox chkIpThreatShare = new CheckBox();
+        readonly CheckBox chkIpThreatReceive = new CheckBox();
+        readonly ComboBox cmbIpThreatLevel = new ComboBox();
+        readonly Label lblIpThreatStatus = new Label();
+        string _ipThreatKey;
 
         // App settings / autostart
         readonly CheckBox chkAutoStart = new CheckBox();
@@ -204,6 +209,7 @@ namespace IPBanFrontend
                 {
                     UpdateElevationBanner();
                     LoadAppSettingsUi();
+                    TryRepairAutoStart();
                     FullReload();
                     RunWeeklyBackupIfDue();
                     logTimer.Start();
@@ -299,8 +305,9 @@ namespace IPBanFrontend
                     "Beheert whitelist/blacklist, instellingen, actieve bans (sqlite + firewall),\n" +
                     "mislukte logins en live logs — zonder XML handmatig te bewerken.\n\n" +
                     "Geen multi-server / country-block / IPBan Shield (dat is Pro).\n\n" +
+                    "IPThreat (gratis): deel failed logins en ontvang community-lijsten.\n" +
                     "Sneltoetsen:  Ctrl+1 Home  ·  Ctrl+2 Whitelist  ·  Ctrl+S Opslaan  ·  Ctrl+R Herladen\n" +
-                    "https://ipban.com",
+                    "https://ipban.com  ·  https://ipthreat.net",
                     "Over IPBan Frontend", MessageBoxButtons.OK, MessageBoxIcon.Information));
 
             menu.Items.AddRange(new ToolStripItem[] { mFile, mSvc, mAct, mHelp });
@@ -1539,7 +1546,7 @@ namespace IPBanFrontend
                 AutoSize = true,
                 Font = new Font(Font, FontStyle.Bold)
             };
-            chkAutoStart.Text = "enabled — Windows-service starten bij systeemstart (ook zonder ingelogde gebruiker)";
+            chkAutoStart.Text = "enabled — Windows-service starten bij systeemstart (kopie in Program Files, ook zonder login)";
             chkAutoStart.AutoSize = true;
             chkAutoStart.Left = 12;
             chkAutoStart.Top = 30;
@@ -1582,6 +1589,8 @@ namespace IPBanFrontend
             {
                 title, chkAutoStart, chkGuiAtLogon, chkAutoBlacklist, lblAutoStartStatus, btnApply, btnLog
             });
+
+            var ipThreatPanel = BuildIpThreatPanel();
 
             var dataPanel = new Panel
             {
@@ -1714,8 +1723,109 @@ namespace IPBanFrontend
             split.Panel2.Controls.Add(lower);
             page.Controls.Add(split);
             page.Controls.Add(dataPanel);
+            page.Controls.Add(ipThreatPanel);
             page.Controls.Add(autoPanel);
             return page;
+        }
+
+        Panel BuildIpThreatPanel()
+        {
+            var panel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 176,
+                Padding = new Padding(12, 10, 12, 8),
+                BackColor = Color.FromArgb(240, 253, 250)
+            };
+            var title = new Label
+            {
+                Text = "IPThreat — Deel + ontvang betere community-data",
+                Left = 12,
+                Top = 6,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold)
+            };
+            chkIpThreatShare.Text = "Deel: failed logins automatisch naar IPThreat sturen (IPThreatApiKey)";
+            chkIpThreatShare.AutoSize = true;
+            chkIpThreatShare.Left = 12;
+            chkIpThreatShare.Top = 30;
+            chkIpThreatShare.Checked = true;
+            chkIpThreatShare.CheckedChanged += (s, e) => RefreshIpThreatStatusLabel();
+
+            chkIpThreatReceive.Text = "Ontvang: community-lijst in FirewallUriRules (sync elk uur, gzip)";
+            chkIpThreatReceive.AutoSize = true;
+            chkIpThreatReceive.Left = 12;
+            chkIpThreatReceive.Top = 52;
+            chkIpThreatReceive.Checked = true;
+            chkIpThreatReceive.CheckedChanged += (s, e) => RefreshIpThreatStatusLabel();
+
+            var lblLvl = new Label
+            {
+                Text = "Drempel",
+                Left = 12,
+                Top = 80,
+                AutoSize = true,
+                ForeColor = Muted
+            };
+            cmbIpThreatLevel.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbIpThreatLevel.SetBounds(70, 76, 280, 26);
+            cmbIpThreatLevel.Items.AddRange(new object[]
+            {
+                "100% — meest conservatief (minste IP’s)",
+                "90% — aanbevolen",
+                "80%",
+                "70%",
+                "50% — agressiever (meer IP’s)"
+            });
+            cmbIpThreatLevel.SelectedIndex = 1;
+            cmbIpThreatLevel.SelectedIndexChanged += (s, e) => RefreshIpThreatStatusLabel();
+
+            lblIpThreatStatus.SetBounds(12, 108, 760, 56);
+            lblIpThreatStatus.ForeColor = Muted;
+            lblIpThreatStatus.Text = "IPThreat: —";
+
+            var btnApply = MakeButton("Toepassen", 880, 28, 100);
+            btnApply.BackColor = Accent;
+            btnApply.ForeColor = Color.White;
+            btnApply.FlatStyle = FlatStyle.Flat;
+            btnApply.Click += (s, e) => ApplyIpThreat(true);
+
+            var lnkLists = new LinkLabel
+            {
+                Text = "Lijsten op ipthreat.net",
+                AutoSize = true,
+                Left = 860,
+                Top = 66,
+                LinkColor = Accent
+            };
+            lnkLists.LinkClicked += (s, e) => OpenUrl(IpThreat.ListsPage);
+
+            var lnkDocs = new LinkLabel
+            {
+                Text = "IPBan-integratie",
+                AutoSize = true,
+                Left = 860,
+                Top = 88,
+                LinkColor = Accent
+            };
+            lnkDocs.LinkClicked += (s, e) => OpenUrl(IpThreat.DocsPage);
+
+            var lnkPerms = new LinkLabel
+            {
+                Text = "Reporting-rechten aanvragen",
+                AutoSize = true,
+                Left = 860,
+                Top = 110,
+                LinkColor = Accent
+            };
+            lnkPerms.LinkClicked += (s, e) => OpenUrl(IpThreat.PermissionsPage);
+
+            panel.Controls.AddRange(new Control[]
+            {
+                title, chkIpThreatShare, chkIpThreatReceive, lblLvl, cmbIpThreatLevel,
+                lblIpThreatStatus, btnApply, lnkLists, lnkDocs, lnkPerms
+            });
+            return panel;
         }
 
         TabPage BuildFirewallTab()
@@ -1885,6 +1995,7 @@ namespace IPBanFrontend
             if (!File.Exists(ConfigPath))
             {
                 SetStatus("ipban.config niet gevonden in " + InstallDir);
+                RefreshIpThreatStatusLabel();
                 return;
             }
 
@@ -1905,11 +2016,12 @@ namespace IPBanFrontend
                 txtFirewallRules.Text = NormalizeMultiline(IpBanConfig.ReadValue(doc, "FirewallRules"));
                 txtFirewallUriRules.Text = NormalizeMultiline(IpBanConfig.ReadValue(doc, "FirewallUriRules"));
                 _firewallPrefix = IpBanConfig.ReadValue(doc, "FirewallRulePrefix") ?? "IPBan_";
+                LoadIpThreatUi(doc);
 
                 foreach (var key in IpBanConfig.EditableKeys)
                 {
                     if (key == "UserNameWhitelist" || key == "FirewallRules" || key == "FirewallUriRules"
-                        || key == "WhitelistRegex" || key == "BlacklistRegex")
+                        || key == "WhitelistRegex" || key == "BlacklistRegex" || key == "IPThreatApiKey")
                         continue;
                     var val = IpBanConfig.ReadValue(doc, key) ?? "";
                     string hint;
@@ -1950,19 +2062,27 @@ namespace IPBanFrontend
                 IpBanConfig.WriteValue(doc, "BlacklistRegex", GetCueText(txtBlackRegex).Trim());
                 IpBanConfig.WriteValue(doc, "UserNameWhitelist", txtUserNames.Text.Trim());
                 IpBanConfig.WriteValue(doc, "FirewallRules", txtFirewallRules.Text.Replace("\r\n", "\n"));
-                IpBanConfig.WriteValue(doc, "FirewallUriRules", txtFirewallUriRules.Text.Replace("\r\n", "\n"));
+                IpBanConfig.WriteValue(doc, "FirewallUriRules",
+                    IpThreat.UpsertReceive(txtFirewallUriRules.Text.Replace("\r\n", "\n"),
+                        chkIpThreatReceive.Checked, SelectedIpThreatLevel()));
+                var shareKey = chkIpThreatShare.Checked ? (ResolveIpThreatKey() ?? "") : "";
+                IpBanConfig.WriteValue(doc, IpThreat.ConfigKey, shareKey);
 
                 foreach (DataGridViewRow row in gridSettings.Rows)
                 {
                     if (row.IsNewRow) continue;
                     var key = Convert.ToString(row.Cells[0].Value);
                     var val = Convert.ToString(row.Cells[1].Value) ?? "";
-                    if (!string.IsNullOrEmpty(key))
+                    if (!string.IsNullOrEmpty(key) && key != IpThreat.ConfigKey)
                         IpBanConfig.WriteValue(doc, key, val);
                 }
 
+                IpBanConfig.WriteValue(doc, IpThreat.ConfigKey, shareKey);
+
                 var backup = IpBanConfig.BackupAndSave(ConfigPath, doc);
                 _firewallPrefix = IpBanConfig.ReadValue(doc, "FirewallRulePrefix") ?? "IPBan_";
+                txtFirewallUriRules.Text = NormalizeMultiline(IpBanConfig.ReadValue(doc, "FirewallUriRules"));
+                LoadIpThreatUi(doc);
                 SetDirty(false);
                 SetStatus("Opgeslagen. Backup: " + Path.GetFileName(backup));
 
@@ -1977,6 +2097,106 @@ namespace IPBanFrontend
             catch (Exception ex)
             {
                 MessageBox.Show(this, ex.Message, "Opslaan mislukt", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        void LoadIpThreatUi(XDocument doc)
+        {
+            _ipThreatKey = IpThreat.ResolveApiKey(ConfigPath);
+            chkIpThreatShare.Checked = IpThreat.HasShare(doc);
+            var uri = txtFirewallUriRules.Text;
+            var level = IpThreat.TryParseLevel(uri);
+            chkIpThreatReceive.Checked = level != null;
+            SelectIpThreatLevel(level ?? IpThreat.DefaultLevel);
+            RefreshIpThreatStatusLabel();
+        }
+
+        string ResolveIpThreatKey()
+        {
+            var raw = !string.IsNullOrWhiteSpace(_ipThreatKey) ? _ipThreatKey : IpThreat.ResolveApiKey(ConfigPath);
+            return IpThreat.NormalizeApiKey(raw);
+        }
+
+        int SelectedIpThreatLevel()
+        {
+            switch (cmbIpThreatLevel.SelectedIndex)
+            {
+                case 0: return 100;
+                case 2: return 80;
+                case 3: return 70;
+                case 4: return 50;
+                default: return 90;
+            }
+        }
+
+        void SelectIpThreatLevel(int level)
+        {
+            int idx;
+            switch (IpThreat.ClampLevel(level))
+            {
+                case 100: idx = 0; break;
+                case 80: idx = 2; break;
+                case 70: idx = 3; break;
+                case 50: idx = 4; break;
+                default: idx = 1; break;
+            }
+            if (cmbIpThreatLevel.Items.Count > idx)
+                cmbIpThreatLevel.SelectedIndex = idx;
+        }
+
+        void RefreshIpThreatStatusLabel()
+        {
+            var key = ResolveIpThreatKey();
+            var share = chkIpThreatShare.Checked;
+            var receive = chkIpThreatReceive.Checked;
+            var level = SelectedIpThreatLevel();
+            var text = IpThreat.Describe(share, receive, level)
+                + "  ·  key " + IpThreat.MaskKey(key)
+                + (string.IsNullOrWhiteSpace(key) ? "  — zet IPThreat_API_KEY in .env" : "");
+            var err = share ? IpThreat.LastShareError(LogPath) : null;
+            if (!string.IsNullOrEmpty(err))
+            {
+                lblIpThreatStatus.Text = text + Environment.NewLine + err;
+                lblIpThreatStatus.ForeColor = Color.FromArgb(180, 70, 0);
+            }
+            else
+            {
+                lblIpThreatStatus.Text = text;
+                lblIpThreatStatus.ForeColor = Muted;
+            }
+        }
+
+        void ApplyIpThreat(bool askRestart)
+        {
+            var key = ResolveIpThreatKey();
+            if (chkIpThreatShare.Checked && string.IsNullOrWhiteSpace(key))
+            {
+                MessageBox.Show(this,
+                    "Geen IPThreat API-key gevonden.\n\nZet IPThreat_API_KEY in .env (naast de exe of in de projectmap) en herlaad.",
+                    "IPThreat", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            _ipThreatKey = key;
+            if (chkIpThreatShare.Checked)
+                EnvFile.Upsert(IpThreat.ApiKeyEnvName, key);
+            txtFirewallUriRules.Text = IpThreat.UpsertReceive(
+                txtFirewallUriRules.Text.Replace("\r\n", "\n"),
+                chkIpThreatReceive.Checked,
+                SelectedIpThreatLevel());
+            RefreshIpThreatStatusLabel();
+            SaveConfig(askRestart);
+        }
+
+        void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Openen", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -3638,6 +3858,24 @@ namespace IPBanFrontend
             UpdateBackupStatus();
         }
 
+        void TryRepairAutoStart()
+        {
+            if (!Elevation.IsAdministrator()) return;
+            try
+            {
+                var prefs = AppSettings.Load();
+                if (!prefs.Enabled) return;
+                if (!AutoStartManager.NeedsRepair(prefs.StartGuiAtLogon)) return;
+                AutoStartManager.Install(prefs.StartGuiAtLogon);
+                LoadAppSettingsUi();
+                SetStatus("Autostart hersteld — service start bij boot, GUI na login");
+            }
+            catch (Exception ex)
+            {
+                AppSettings.AppendServiceLog("Autostart-herstel: " + ex.Message);
+            }
+        }
+
         void RefreshAutoStartStatus()
         {
             try
@@ -3648,7 +3886,7 @@ namespace IPBanFrontend
                 lblAutoStartStatus.Text = "Service: " + st +
                     "  ·  logon-GUI taak: " + task +
                     (installed ? "" : "  — zet enabled aan + Toepassen (admin)") +
-                    "  ·  " + AppSettings.FilePath;
+                    "  ·  " + AutoStartManager.InstallFolder;
             }
             catch
             {
@@ -3727,7 +3965,8 @@ namespace IPBanFrontend
                 LoadAppSettingsUi();
                 MessageBox.Show(this,
                     enable
-                        ? "Windows-service 'IPBanFrontend' staat op Automatisch (start bij boot).\n" +
+                        ? "Windows-service 'IPBanFrontend' staat op Automatisch (vertraagd) en start bij boot.\n" +
+                          "Geïnstalleerd in: " + AutoStartManager.InstallFolder + "\n" +
                           (guiLogon ? "Na login start ook de GUI in het systeemvak.\n" : "") +
                           "Auto-blacklist: " + (_autoBlacklistAfter > 0 ? "aan (na 3 bans).\n" : "uit.\n") +
                           "\nLet op: een GUI kan niet zichtbaar draaien vóór login (Session 0).\n" +

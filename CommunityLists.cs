@@ -25,6 +25,7 @@ namespace IPBanFrontend
 
         /// <summary>Suggested free lists — 8h sync, matching IPBan FirewallUriRules format.</summary>
         public const string DefaultUriRules =
+            "IPThreat,00:01:00:00,https://lists.ipthreat.net/file/ipthreat-lists/threat/threat-90.txt.gz,20000\n" +
             "EmergingThreats,00:08:00:00,https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt,10000\n" +
             "CINSArmy,00:08:00:00,https://cinsscore.com/list/ci-badguys.txt,10000\n" +
             "GreenSnow,00:08:00:00,https://blocklist.greensnow.co/greensnow.txt,5000\n" +

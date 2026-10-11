@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Threading;
@@ -49,6 +50,26 @@ namespace IPBanFrontend
             {
                 ServiceBase.Run(new FrontendService());
                 return 0;
+            }
+
+            if (HasFlag(args, "--apply-ipthreat"))
+            {
+                try
+                {
+                    var prefs = AppSettings.Load();
+                    var dir = string.IsNullOrWhiteSpace(prefs.InstallDir)
+                        ? @"C:\Program Files\IPBan"
+                        : prefs.InstallDir;
+                    var config = Path.Combine(dir.TrimEnd('\\', '/'), "ipban.config");
+                    var result = IpThreat.Apply(config, true, true, IpThreat.DefaultLevel);
+                    AppSettings.AppendServiceLog("IPThreat apply: " + result.Message);
+                    return result.Ok ? 0 : 1;
+                }
+                catch (Exception ex)
+                {
+                    AppSettings.AppendServiceLog("IPThreat apply fout: " + ex.Message);
+                    return 1;
+                }
             }
 
             if (HasFlag(args, "--install-autostart"))

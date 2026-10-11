@@ -43,5 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.manifest" />
+    <None Include=".env" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(MSBuildProjectDirectory)\.env')" />
+    <None Include=".env.example" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
